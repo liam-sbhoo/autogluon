@@ -231,6 +231,29 @@ class Tab2D(BaseModel):
 
         return model
     
+    @classmethod
+    def from_file(cls, path_to_weights: str, device: str = "cuda") -> "Tab2D":
+        config_path = os.path.join(path_to_weights, "config.json")
+        with open(config_path, "r") as f:
+            config = json.load(f)
+
+        model = cls(
+            dim=config["dim"],
+            dim_output=config["dim_output"],
+            n_layers=config["n_layers"],
+            n_heads=config["n_heads"],
+            task=config["task"],
+            use_pretrained_weights=False,
+            path_to_weights=path_to_weights,
+            device=device
+        )
+
+        weights_path = os.path.join(path_to_weights, "model.safetensors")
+        state_dict = load_file(weights_path, device=device)
+        model.load_state_dict(state_dict)
+
+        return model
+    
     
 class Padder(torch.nn.Module):
 

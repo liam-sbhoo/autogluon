@@ -198,33 +198,40 @@ class MitraBase(BaseEstimator):
                 self.trainers.clear()
 
                 self.train_time = 0
+
+                # Load model once only
+                # since we care about zero-shot with ensemble
+                if USE_HF:
+                    if task == 'classification':
+                        if self.hf_cls_model is not None:
+                            model = Tab2D.from_pretrained(self.hf_cls_model, device=self.device)
+                        elif self.hf_general_model is not None:
+                            model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
+                        else:
+                            model = Tab2D.from_pretrained("autogluon/mitra-classifier", device=self.device)
+                    elif task == 'regression':
+                        # if self.hf_reg_model is not None:
+                        #     model = Tab2D.from_pretrained(self.hf_reg_model, device=self.device)
+                        # elif self.hf_general_model is not None:
+                        #     model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
+                        # else:
+                        #     model = Tab2D.from_pretrained("autogluon/mitra-regressor", device=self.device)
+                        model = Tab2D.from_file(self.state_dict, device=self.device)
+                else:
+                    model = Tab2D(
+                        dim=cfg.hyperparams['dim'],
+                        dim_output=dim_output,
+                        n_layers=cfg.hyperparams['n_layers'],
+                        n_heads=cfg.hyperparams['n_heads'],
+                        task=task.upper(),
+                        use_pretrained_weights=True,
+                        path_to_weights=Path(self.state_dict),
+                        device=self.device,
+                    )
+
+                fitting_time = time.time()
+
                 for _ in range(self.n_estimators):
-                    if USE_HF:
-                        if task == 'classification':
-                            if self.hf_cls_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_cls_model, device=self.device)
-                            elif self.hf_general_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
-                            else:
-                                model = Tab2D.from_pretrained("autogluon/mitra-classifier", device=self.device)
-                        elif task == 'regression':
-                            if self.hf_reg_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_reg_model, device=self.device)
-                            elif self.hf_general_model is not None:
-                                model = Tab2D.from_pretrained(self.hf_general_model, device=self.device)
-                            else:
-                                model = Tab2D.from_pretrained("autogluon/mitra-regressor", device=self.device)
-                    else:
-                        model = Tab2D(
-                            dim=cfg.hyperparams['dim'],
-                            dim_output=dim_output,
-                            n_layers=cfg.hyperparams['n_layers'],
-                            n_heads=cfg.hyperparams['n_heads'],
-                            task=task.upper(),
-                            use_pretrained_weights=True,
-                            path_to_weights=Path(self.state_dict),
-                            device=self.device,
-                        )
                     trainer = TrainerFinetune(cfg, model, n_classes=n_classes, device=self.device, rng=rng, verbose=self.verbose)
 
                     start_time = time.time()
@@ -235,6 +242,10 @@ class MitraBase(BaseEstimator):
                     self.train_time += end_time - start_time
 
                     success = True
+
+                end_fitting_time = time.time()
+                print(f"fitting time: {end_fitting_time - fitting_time} seconds")
+
 
             except torch.cuda.OutOfMemoryError:
                 if cfg.hyperparams["max_samples_support"] >= 2048:

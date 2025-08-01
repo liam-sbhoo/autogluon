@@ -15,7 +15,10 @@ from sklearn.preprocessing import PowerTransformer
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
-from autogluon.tabular import __version__
+try:
+    from autogluon.tabular import __version__
+except ImportError:
+    __version__ = "FIX_ME"
 
 if TYPE_CHECKING:
     import pandas as pd

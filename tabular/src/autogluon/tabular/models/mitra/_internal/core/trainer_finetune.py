@@ -78,111 +78,111 @@ class TrainerFinetune(BaseEstimator):
 
         self.preprocessor.fit(x_train, y_train)
 
-        x_train_transformed = self.preprocessor.transform_X(x_train)
-        y_train_transformed = self.preprocessor.transform_y(y_train)
+        # x_train_transformed = self.preprocessor.transform_X(x_train)
+        # y_train_transformed = self.preprocessor.transform_y(y_train)
 
-        dataset_train_generator = DatasetFinetuneGenerator(
-            self.cfg,
-            x = x_train_transformed,
-            y = y_train_transformed,
-            task = self.cfg.task,
-            max_samples_support = self.cfg.hyperparams['max_samples_support'],
-            max_samples_query = self.cfg.hyperparams['max_samples_query'],
-            rng=self.rng,
-        )
+        # dataset_train_generator = DatasetFinetuneGenerator(
+        #     self.cfg,
+        #     x = x_train_transformed,
+        #     y = y_train_transformed,
+        #     task = self.cfg.task,
+        #     max_samples_support = self.cfg.hyperparams['max_samples_support'],
+        #     max_samples_query = self.cfg.hyperparams['max_samples_query'],
+        #     rng=self.rng,
+        # )
 
         self.checkpoint.reset(self.model)
 
-        metrics_valid = self.evaluate(x_train, y_train, x_val, y_val)
-        if self.verbose:
-            self.log_start_metrics(metrics_valid)
-        self.checkpoint(self.model, metrics_valid.loss)
+        # metrics_valid = self.evaluate(x_train, y_train, x_val, y_val)
+        # if self.verbose:
+            # self.log_start_metrics(metrics_valid)
+        # self.checkpoint(self.model, metrics_valid.loss)
 
-        start_time = time.time()
+        # start_time = time.time()
 
-        for epoch in range(1, self.cfg.hyperparams['max_epochs']+1):
+        # for epoch in range(1, self.cfg.hyperparams['max_epochs']+1):
 
-            dataset_train = next(dataset_train_generator)
-            loader_train = self.make_loader(dataset_train, training=True)
-            self.model.train()
+        #     dataset_train = next(dataset_train_generator)
+        #     loader_train = self.make_loader(dataset_train, training=True)
+        #     self.model.train()
 
-            prediction_metrics_tracker = PredictionMetricsTracker(task=self.cfg.task, preprocessor=self.preprocessor)
+        #     prediction_metrics_tracker = PredictionMetricsTracker(task=self.cfg.task, preprocessor=self.preprocessor)
 
-            for batch in loader_train:
+        #     for batch in loader_train:
 
-                with torch.autocast(device_type=self.device, dtype=getattr(torch, self.cfg.hyperparams['precision'])):
+        #         with torch.autocast(device_type=self.device, dtype=getattr(torch, self.cfg.hyperparams['precision'])):
 
-                    x_support = batch['x_support'].to(self.device, non_blocking=True)
-                    y_support = batch['y_support'].to(self.device, non_blocking=True)
-                    x_query = batch['x_query'].to(self.device, non_blocking=True)
-                    y_query = batch['y_query'].to(self.device, non_blocking=True)
-                    padding_features = batch['padding_features'].to(self.device, non_blocking=True)
-                    padding_obs_support = batch['padding_obs_support'].to(self.device, non_blocking=True)
-                    padding_obs_query = batch['padding_obs_query'].to(self.device, non_blocking=True)
+        #             x_support = batch['x_support'].to(self.device, non_blocking=True)
+        #             y_support = batch['y_support'].to(self.device, non_blocking=True)
+        #             x_query = batch['x_query'].to(self.device, non_blocking=True)
+        #             y_query = batch['y_query'].to(self.device, non_blocking=True)
+        #             padding_features = batch['padding_features'].to(self.device, non_blocking=True)
+        #             padding_obs_support = batch['padding_obs_support'].to(self.device, non_blocking=True)
+        #             padding_obs_query = batch['padding_obs_query'].to(self.device, non_blocking=True)
 
-                    # Convert numerical y_support to bin ids
-                    if self.cfg.task == Task.REGRESSION and self.cfg.hyperparams['regression_loss'] == LossName.CROSS_ENTROPY:
-                        y_support = torch.bucketize(y_support, self.bins) - 1
-                        y_support = torch.clamp(y_support, 0, self.cfg.hyperparams['dim_output']-1).to(torch.int64)
-                        y_query_bin_ids = torch.bucketize(y_query, self.bins) - 1
-                        y_query_bin_ids = torch.clamp(y_query_bin_ids, 0, self.cfg.hyperparams['dim_output']-1).to(torch.int64)
+        #             # Convert numerical y_support to bin ids
+        #             if self.cfg.task == Task.REGRESSION and self.cfg.hyperparams['regression_loss'] == LossName.CROSS_ENTROPY:
+        #                 y_support = torch.bucketize(y_support, self.bins) - 1
+        #                 y_support = torch.clamp(y_support, 0, self.cfg.hyperparams['dim_output']-1).to(torch.int64)
+        #                 y_query_bin_ids = torch.bucketize(y_query, self.bins) - 1
+        #                 y_query_bin_ids = torch.clamp(y_query_bin_ids, 0, self.cfg.hyperparams['dim_output']-1).to(torch.int64)
 
-                    if self.cfg.model_name == ModelName.TABPFN:
-                        y_hat = self.model(x_support, y_support, x_query, task=self.cfg.task).squeeze(-1)
-                    elif self.cfg.model_name in [ModelName.TAB2D, ModelName.TAB2D_COL_ROW, ModelName.TAB2D_SDPA]:
-                        y_hat = self.model(x_support, y_support, x_query, padding_features, padding_obs_support, padding_obs_query)
+        #             if self.cfg.model_name == ModelName.TABPFN:
+        #                 y_hat = self.model(x_support, y_support, x_query, task=self.cfg.task).squeeze(-1)
+        #             elif self.cfg.model_name in [ModelName.TAB2D, ModelName.TAB2D_COL_ROW, ModelName.TAB2D_SDPA]:
+        #                 y_hat = self.model(x_support, y_support, x_query, padding_features, padding_obs_support, padding_obs_query)
 
-                    # Convert numerical y_query to bin ids
-                    if self.cfg.task == Task.REGRESSION and self.cfg.hyperparams['regression_loss'] == LossName.CROSS_ENTROPY:
-                        loss = self.loss(y_hat, y_query_bin_ids)
-                    elif self.cfg.task == Task.CLASSIFICATION:
-                        # for b in range(y_support.shape[0]):
-                        #     unique_classes = len(torch.unique(torch.cat((y_support[b], y_query[b]))))
-                        #     y_hat[b, :, unique_classes:] = 0
-                        loss = self.loss(y_hat, y_query)
-                    else:
-                        loss = self.loss(y_hat, y_query)
+        #             # Convert numerical y_query to bin ids
+        #             if self.cfg.task == Task.REGRESSION and self.cfg.hyperparams['regression_loss'] == LossName.CROSS_ENTROPY:
+        #                 loss = self.loss(y_hat, y_query_bin_ids)
+        #             elif self.cfg.task == Task.CLASSIFICATION:
+        #                 # for b in range(y_support.shape[0]):
+        #                 #     unique_classes = len(torch.unique(torch.cat((y_support[b], y_query[b]))))
+        #                 #     y_hat[b, :, unique_classes:] = 0
+        #                 loss = self.loss(y_hat, y_query)
+        #             else:
+        #                 loss = self.loss(y_hat, y_query)
 
-                self.optimizer.zero_grad()
-                self.scaler.scale(loss).backward()
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
+        #         self.optimizer.zero_grad()
+        #         self.scaler.scale(loss).backward()
+        #         self.scaler.step(self.optimizer)
+        #         self.scaler.update()
 
-                # Convert bin id predictions to numerical values
-                if self.cfg.task == Task.REGRESSION and self.cfg.hyperparams['regression_loss'] == LossName.CROSS_ENTROPY:
-                    y_hat = torch.argmax(y_hat, dim=-1)
-                    y_hat = self.bins[y_hat] + self.bin_width / 2
+        #         # Convert bin id predictions to numerical values
+        #         if self.cfg.task == Task.REGRESSION and self.cfg.hyperparams['regression_loss'] == LossName.CROSS_ENTROPY:
+        #             y_hat = torch.argmax(y_hat, dim=-1)
+        #             y_hat = self.bins[y_hat] + self.bin_width / 2
 
-                y_hat = y_hat.float()
-                if self.cfg.task == Task.REGRESSION:
-                    prediction_metrics_tracker.update(y_hat, y_query, train=True)
-                else:
-                    prediction_metrics_tracker.update(y_hat, y_query, train=False)
+        #         y_hat = y_hat.float()
+        #         if self.cfg.task == Task.REGRESSION:
+        #             prediction_metrics_tracker.update(y_hat, y_query, train=True)
+        #         else:
+        #             prediction_metrics_tracker.update(y_hat, y_query, train=False)
 
-            metrics_train = prediction_metrics_tracker.get_metrics()
-            metrics_valid = self.evaluate(x_train, y_train, x_val, y_val)
+        #     metrics_train = prediction_metrics_tracker.get_metrics()
+        #     metrics_valid = self.evaluate(x_train, y_train, x_val, y_val)
 
-            if self.verbose:
-                self.log_metrics(epoch, metrics_train, metrics_valid)
+        #     if self.verbose:
+        #         self.log_metrics(epoch, metrics_train, metrics_valid)
 
-            self.checkpoint(self.model, metrics_valid.loss)
+        #     self.checkpoint(self.model, metrics_valid.loss)
 
-            self.early_stopping(metrics_valid.metrics[self.metric])
-            if self.early_stopping.we_should_stop():
-                if self.verbose:
-                    logger.info("Early stopping")
-                break
+        #     self.early_stopping(metrics_valid.metrics[self.metric])
+        #     if self.early_stopping.we_should_stop():
+        #         if self.verbose:
+        #             logger.info("Early stopping")
+        #         break
 
-            if self.cfg.hyperparams["budget"] is not None and self.cfg.hyperparams["budget"] > 0 and time.time() - start_time > self.cfg.hyperparams["budget"]:
-                logger.info("Time limit reached")
-                break
+        #     if self.cfg.hyperparams["budget"] is not None and self.cfg.hyperparams["budget"] > 0 and time.time() - start_time > self.cfg.hyperparams["budget"]:
+        #         logger.info("Time limit reached")
+        #         break
 
-            if epoch < self.cfg.hyperparams['warmup_steps']:
-                self.scheduler_warmup.step()
-            else:
-                self.scheduler_reduce_on_plateau.step(metrics_valid.loss)
+        #     if epoch < self.cfg.hyperparams['warmup_steps']:
+        #         self.scheduler_warmup.step()
+        #     else:
+        #         self.scheduler_reduce_on_plateau.step(metrics_valid.loss)
 
-        self.checkpoint.set_to_best(self.model)
+        # self.checkpoint.set_to_best(self.model)
 
 
     def evaluate(self, x_support: np.ndarray, y_support: np.ndarray, x_query: np.ndarray, y_query: np.ndarray) -> PredictionMetrics:

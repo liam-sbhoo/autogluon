@@ -17,7 +17,11 @@ from sklearn.impute import SimpleImputer
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
-from autogluon.tabular import __version__
+
+try:
+    from autogluon.tabular import __version__
+except ImportError:
+    __version__ = "FIX_ME"
 
 logger = logging.getLogger(__name__)
 
